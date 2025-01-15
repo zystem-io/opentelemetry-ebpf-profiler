@@ -309,6 +309,11 @@ impl<'obj> Reader<'obj> {
                 })
             })
     }
+
+    /// Returns the raw object file being read.
+    pub fn obj(&self) -> &object::File<'obj> {
+        &self.0
+    }
 }
 
 /// Information and raw data of an object file section.
