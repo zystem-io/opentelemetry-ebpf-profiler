@@ -12,6 +12,7 @@ use flate2::read::ZlibDecoder;
 use memmap2::{Mmap, MmapMut};
 use object::{
     CompressionFormat, Object as _, ObjectSection as _, ObjectSegment as _, ObjectSymbol as _,
+    SymbolFlags,
 };
 use zstd::stream::read::Decoder as ZstdDecoder;
 
@@ -286,6 +287,10 @@ impl<'obj> Reader<'obj> {
                 name: sym.name().expect("validated in `find` step"),
                 virt_addr: sym.address(),
                 length: sym.size(),
+                other: match sym.flags() {
+                    SymbolFlags::Elf { st_other, .. } => st_other,
+                    _ => 0,
+                },
             })
     }
 
@@ -306,6 +311,10 @@ impl<'obj> Reader<'obj> {
                     name: x.name().ok()?, // just skip non-utf8 symbols
                     virt_addr: x.address(),
                     length: x.size(),
+                    other: match x.flags() {
+                        SymbolFlags::Elf { st_other, .. } => st_other,
+                        _ => 0,
+                    },
                 })
             })
     }
@@ -666,6 +675,8 @@ pub struct Symbol<'a> {
     pub virt_addr: VirtAddr,
     /// Length of the function.
     pub length: u64,
+    /// st_other of the symbol.
+    pub other: u8,
 }
 
 impl Symbol<'_> {

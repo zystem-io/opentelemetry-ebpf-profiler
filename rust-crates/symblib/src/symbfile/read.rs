@@ -164,6 +164,7 @@ impl<I: io::Read> Reader<I> {
             },
             depth: range.depth,
             line_table,
+            st_other: 0,
         })
     }
 

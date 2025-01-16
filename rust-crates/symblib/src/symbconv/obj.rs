@@ -41,5 +41,6 @@ fn obj_symbol_to_range(sym: &objfile::Symbol<'_>) -> symbfile::Range {
         call_line: None,
         depth: 0,
         line_table: Default::default(),
+        st_other: sym.other,
     }
 }

@@ -75,6 +75,8 @@ pub struct Range {
     pub depth: u32,
     /// Line table for this executable range.
     pub line_table: SmallVec<[LineTableEntry; 8]>,
+    /// st_other if the symbol has this information.
+    pub st_other: u8,
 }
 
 impl Range {
@@ -175,6 +177,7 @@ mod tests {
                     line_number: 99,
                 },
             ],
+            st_other: 0,
         };
 
         assert_eq!(range.line_number_for_va(0x123 - 1), None);

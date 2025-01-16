@@ -232,6 +232,7 @@ fn process_subroutine(
             call_line: imr.info.call_line().map(|x| x.get() as u32),
             depth: imr.info.depth() as _,
             line_table: SmallVec::new(),
+            st_other: 0,
         };
 
         let line_table = imr.line_table.borrow();

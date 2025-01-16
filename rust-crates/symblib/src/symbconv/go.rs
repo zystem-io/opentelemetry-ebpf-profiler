@@ -102,6 +102,7 @@ fn extract_ranges(obj: &objfile::Reader<'_>, visitor: super::RangeVisitor<'_>) -
             call_line: None,
             depth: 0,
             line_table: Default::default(),
+            st_other: 0,
         };
 
         visitor(range).map_err(Error::Visitor)?;

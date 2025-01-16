@@ -256,6 +256,7 @@ mod tests {
                     call_line: None,
                     depth: *depth,
                     line_table: Default::default(),
+                    st_other: 0,
                 })
                 .unwrap();
             }

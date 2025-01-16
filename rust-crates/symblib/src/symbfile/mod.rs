@@ -130,6 +130,7 @@ mod tests {
                     line_number: (i * (seed % 7) + 1) as u32,
                 })
                 .collect(),
+            st_other: 0,
         }
     }
 
