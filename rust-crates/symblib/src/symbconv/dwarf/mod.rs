@@ -185,10 +185,8 @@ fn process_subroutine(
 
         let mut im_linetab = imr.line_table.borrow_mut();
         for line_record in unit_line_table.query(range.clone()) {
-            let (ref file, Some(line)) = line_record.value else {
-                // Skip records without line/file info.
-                continue;
-            };
+            let file = &line_record.value.0;
+            let line = line_record.value.1.map(u64::from).unwrap_or(0);
 
             // Restrict range to the overlapping region with our node.
             let Some(overlap) = range_overlap(&line_record.range, &range) else {
@@ -198,7 +196,7 @@ fn process_subroutine(
             im_linetab.push(IntermediateLineTableEntry {
                 rng: overlap,
                 file: file.to_string(),
-                line: line.get(),
+                line,
             });
         }
 
