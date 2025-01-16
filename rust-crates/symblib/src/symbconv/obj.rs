@@ -4,7 +4,7 @@
 //! Translates object file (e.g. ELF) symbols into a range symbfile.
 
 use super::{Error, RangeExtractor, RangeVisitor, Result, Stats};
-use crate::{demangle, objfile, symbfile};
+use crate::{objfile, symbfile};
 
 /// Extracts ranges from object file symbols.
 pub struct Extractor<'obj> {
@@ -35,7 +35,7 @@ fn obj_symbol_to_range(sym: &objfile::Symbol<'_>) -> symbfile::Range {
     symbfile::Range {
         elf_va: sym.virt_addr,
         length: sym.length as u32,
-        func: demangle::demangle(sym.name).into_owned(),
+        func: sym.name.to_string(),
         file: None,
         call_file: None,
         call_line: None,

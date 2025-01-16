@@ -24,7 +24,7 @@ mod rangetree;
 
 use self::rangetree::*;
 use crate::symbconv::RangeVisitor;
-use crate::{debug, demangle, dwarf, range_overlap, symbfile, AnyError, VirtAddr};
+use crate::{debug, dwarf, range_overlap, symbfile, AnyError, VirtAddr};
 use fallible_iterator::FallibleIterator;
 use intervaltree::{Element, IntervalTree};
 use smallvec::SmallVec;
@@ -226,7 +226,7 @@ fn process_subroutine(
         let mut record = symbfile::Range {
             elf_va: node.range.start,
             length: (node.range.end - node.range.start) as _,
-            func: demangle::demangle(&name).into_owned(),
+            func: name.into_owned(),
             file: None,
             call_file: imr.info.call_file()?.map(|x| x.to_string()),
             call_line: imr.info.call_line().map(|x| x.get() as u32),
