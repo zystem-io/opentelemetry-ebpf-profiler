@@ -952,7 +952,22 @@ impl<'dwarf> SourceFile<'dwarf> {
         };
 
         let dir_slice = unit.dwarf().attr_string(&unit.unit.gimli_unit, dir_av)?;
-        let dir = Some(dir_slice.to_string_lossy());
+        let mut dir = Some(dir_slice.to_string_lossy());
+
+        // TODO: Do we need to handle special cases?
+        match dir.as_ref() {
+            Some(x) if !x.starts_with("/") => match header.directory(0) {
+                Some(comp_dir) => {
+                    let comp_dir = unit
+                        .dwarf()
+                        .attr_string(&unit.unit.gimli_unit, comp_dir)?
+                        .to_string_lossy();
+                    dir = Some(Cow::Owned(format!("{}/{}", comp_dir, x)));
+                }
+                None => {}
+            },
+            _ => {}
+        }
 
         Ok(Self { id, dir, name })
     }
