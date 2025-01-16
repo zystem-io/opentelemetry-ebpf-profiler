@@ -340,7 +340,6 @@ fn extract_ranges(
             }
         };
 
-        eprintln!("Processing {:?}", &unit);
         match process_unit(unit, &mut visitor) {
             Ok(()) => stats.units_ok += 1,
             Err(e) => {
