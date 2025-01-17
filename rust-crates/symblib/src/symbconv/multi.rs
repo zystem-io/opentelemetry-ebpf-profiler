@@ -177,7 +177,11 @@ fn run_extractor(
                 accept_inline_for = None;
             } else {
                 ranges_accepted += 1;
-                accept_inline_for = Some(rng.va_range());
+                // HACK: Need to properly merge the functions here - but potentially need to do
+                // that recursively? Also not sure if we can handle functions without gaps between
+                // them correctly with the information we currently have (i.e. we don't know the
+                // name associated with a range, so can't do this correctly).
+                accept_inline_for = Some(0..rng.va_range().end);
                 cov_map.add_range(rng.va_range());
                 visitor(rng)?;
             }
