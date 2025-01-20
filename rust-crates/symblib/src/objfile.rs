@@ -649,7 +649,7 @@ pub struct Protection {
 }
 
 impl Protection {
-    fn from_segment_flags(flags: object::SegmentFlags) -> Option<Self> {
+    pub fn from_segment_flags(flags: object::SegmentFlags) -> Option<Self> {
         match flags {
             object::SegmentFlags::Elf { p_flags, .. } => Some(Self {
                 r: p_flags & object::elf::PF_R != 0,
