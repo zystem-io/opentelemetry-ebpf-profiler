@@ -625,6 +625,13 @@ pub struct Subprogram<'dwarf, 'units> {
     die_iter: gimli::EntriesCursor<'units, 'units, R<'dwarf>>,
 }
 
+// type_alias_impl_trait would help us here, but it's nightly only, and I'm not sure about it's
+// status since it hasn't been stabilized for a long time.
+type Iter<'dwarf, 'units> = fallible_iterator::Chain<
+    fallible_iterator::Convert<std::iter::Once<Result<SubprogramInfo<'dwarf, 'units>, Error>>>,
+    InlineInstanceIter<'dwarf, 'units>,
+>;
+
 impl<'dwarf, 'units> Subprogram<'dwarf, 'units> {
     /// Destructively extracts the [`SubprogramInfo`].
     pub fn into_info(self) -> SubprogramInfo<'dwarf, 'units> {
@@ -634,9 +641,8 @@ impl<'dwarf, 'units> Subprogram<'dwarf, 'units> {
     /// Destructively iterate over both this subroutine and and all inline instances.
     ///
     /// TODO: impl IntoFallibleIterator instead?
-    pub fn into_iter(
-        self,
-    ) -> impl FallibleIterator<Item = SubprogramInfo<'dwarf, 'units>, Error = Error> {
+    #[allow(clippy::should_implement_trait)]
+    pub fn into_iter(self) -> Iter<'dwarf, 'units> {
         let inline_iter = self.inline_instances();
         let self_iter = iter::once(Ok(self.into_info()));
         let self_iter = fallible_iterator::convert(self_iter);
@@ -648,8 +654,10 @@ impl<'dwarf, 'units> Subprogram<'dwarf, 'units> {
         InlineInstanceIter {
             unit: self.unit.clone(),
             die_iter: self.die_iter.clone(),
-            tag_stack: smallvec![DW_TAG_subprogram],
+            tag_stack: smallvec![(DW_TAG_subprogram, false)],
             fn_tree_depth: 1,
+
+            inner: None,
         }
     }
 }
@@ -660,8 +668,10 @@ impl<'dwarf, 'units> Subprogram<'dwarf, 'units> {
 pub struct InlineInstanceIter<'dwarf, 'units> {
     unit: Unit<'dwarf, 'units>,
     die_iter: gimli::EntriesCursor<'units, 'units, R<'dwarf>>,
-    tag_stack: SmallVec<[DwTag; 64]>,
+    tag_stack: SmallVec<[(DwTag, bool); 64]>,
     fn_tree_depth: u64,
+
+    inner: Option<Box<Iter<'dwarf, 'units>>>,
 }
 
 impl<'dwarf, 'units> FallibleIterator for InlineInstanceIter<'dwarf, 'units> {
@@ -673,6 +683,13 @@ impl<'dwarf, 'units> FallibleIterator for InlineInstanceIter<'dwarf, 'units> {
             matches!(x, DW_TAG_subprogram | DW_TAG_inlined_subroutine)
         }
 
+        if let Some(inner) = self.inner.as_mut() {
+            match inner.next()? {
+                Some(x) => return Ok(Some(x)),
+                None => self.inner = None,
+            }
+        }
+
         loop {
             let Some((depth_delta, die)) = self.die_iter.next_dfs()? else {
                 return Ok(None);
@@ -682,7 +699,7 @@ impl<'dwarf, 'units> FallibleIterator for InlineInstanceIter<'dwarf, 'units> {
             // always push the current element even if it doesn't have children.
             self.fn_tree_depth -= (0..1 - depth_delta)
                 .flat_map(|_| self.tag_stack.pop())
-                .filter(|&x| tag_affects_depth(x))
+                .filter(|&x| tag_affects_depth(x.0))
                 .count() as u64;
 
             if self.tag_stack.is_empty() {
@@ -693,7 +710,15 @@ impl<'dwarf, 'units> FallibleIterator for InlineInstanceIter<'dwarf, 'units> {
                 return Err(Error::InlineTreeTooDeep);
             }
 
-            self.tag_stack.push(die.tag());
+            // See section 3.3.8 and 3.3.8.1, I think we have to ignore abstract ones, but they may
+            // contain non-abstract DW_TAG_subprograms that we should emit.
+            let is_abstract = die.attr_value_raw(DW_AT_inline)?.is_some_and(|x| {
+                let gimli::AttributeValue::Inline(i) = x else {
+                    return false;
+                };
+                !matches!(i, DW_INL_not_inlined)
+            });
+            self.tag_stack.push((die.tag(), is_abstract));
 
             if !tag_affects_depth(die.tag()) {
                 continue;
@@ -708,8 +733,39 @@ impl<'dwarf, 'units> FallibleIterator for InlineInstanceIter<'dwarf, 'units> {
                 continue;
             }
 
+            // Handle nested subprograms that are not abstract.
+            if die.tag() == DW_TAG_subprogram && !is_abstract {
+                let sub = Subprogram {
+                    unit: self.unit.clone(),
+                    info: SubprogramInfo::from_die(0, self.unit.clone(), die)?,
+                    die_iter: self.die_iter.clone(),
+                };
+                let mut iter = Box::new(sub.into_iter());
+                let to_yield = iter.next()?;
+                // Should always yield at least one element.
+                debug_assert!(to_yield.is_some());
+
+                // TODO: Something in the range tree is broken if we actually yield inline entries
+                // for the subprogram.
+                //
+                // For now we just handle it by subtracting the correct number of current
+                // subprograms from the stack.
+                // self.inner = Some(iter);
+
+                break Ok(to_yield);
+            }
+
             break Ok(Some(SubprogramInfo::from_die(
-                self.fn_tree_depth - 1,
+                self.fn_tree_depth
+                    - 1
+                    - self
+                        .tag_stack
+                        .iter()
+                        .filter(|x| x.0 == DW_TAG_subprogram && !x.1)
+                        .count() as u64
+                        // +1 because we put an initial DW_TAG_subprogram that is not abstract on
+                        // the stack.
+                    + 1,
                 self.unit.clone(),
                 die,
             )?));
